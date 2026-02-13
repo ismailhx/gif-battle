@@ -315,6 +315,11 @@ socket.on('phase:voting', (data) => {
     stopTimer();
     showPhase('voting');
     
+    // Display the prompt at the top
+    if (data.prompt) {
+        document.getElementById('voting-prompt-display').textContent = `"${data.prompt}"`;
+    }
+    
     if (data.noSubmissions) {
         // No GIFs were submitted
         document.getElementById('gifs-grid').innerHTML = 
@@ -964,21 +969,45 @@ function displayFinalLeaderboard(players) {
     });
 }
 
+let lastSpokenSecond = -1;
+
 function startTimer(endTime) {
     stopTimer();
+    lastSpokenSecond = -1;
     
     timerInterval = setInterval(() => {
         const remaining = Math.max(0, endTime - Date.now());
         const minutes = Math.floor(remaining / 60000);
         const seconds = Math.floor((remaining % 60000) / 1000);
+        const totalSeconds = Math.floor(remaining / 1000);
         
-        document.getElementById('timer').textContent = 
-            `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        const timerEl = document.getElementById('timer');
+        timerEl.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        
+        // Voice countdown in last 10 seconds
+        if (totalSeconds <= 10 && totalSeconds > 0 && totalSeconds !== lastSpokenSecond) {
+            lastSpokenSecond = totalSeconds;
+            timerEl.style.color = '#ff4444';
+            timerEl.style.fontSize = '2em';
+            speakNumber(totalSeconds);
+        }
         
         if (remaining <= 0) {
             stopTimer();
+            timerEl.style.color = '';
+            timerEl.style.fontSize = '';
         }
     }, 100);
+}
+
+function speakNumber(num) {
+    if ('speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance(num.toString());
+        utterance.rate = 1.2;
+        utterance.pitch = 1;
+        utterance.volume = 0.8;
+        speechSynthesis.speak(utterance);
+    }
 }
 
 function stopTimer() {

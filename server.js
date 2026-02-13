@@ -21,6 +21,7 @@ app.use(express.static(path.join(__dirname, 'public'), {
 // Game state
 const gameState = {
   players: {},
+  disconnectedPlayers: {}, // name+emoji -> { points, wasGM } for rejoin
   gameMaster: null,
   currentRound: 0,
   maxRounds: 10,
@@ -60,18 +61,18 @@ function startSubmittingPhase() {
   gameState.phase = 'submitting';
   gameState.gifs = {};
   gameState.votes = {};
-  gameState.timerEndTime = Date.now() + 60000; // 60 seconds to find a GIF
+  gameState.timerEndTime = Date.now() + 100000; // 100 seconds to find a GIF
   
   io.emit('phase:submitting', {
     prompt: gameState.currentPrompt,
     timerEndTime: gameState.timerEndTime
   });
   
-  // Auto-advance after 60 seconds
+  // Auto-advance after 100 seconds
   if (gameState.timer) clearTimeout(gameState.timer);
   gameState.timer = setTimeout(() => {
     startVotingPhase();
-  }, 60000);
+  }, 100000);
 }
 
 function startVotingPhase() {
@@ -98,18 +99,19 @@ function startVotingPhase() {
     [gifsList[i], gifsList[j]] = [gifsList[j], gifsList[i]];
   }
   
-  gameState.timerEndTime = Date.now() + 60000; // 1 minute to vote
+  gameState.timerEndTime = Date.now() + 100000; // 100 seconds to vote
   
   io.emit('phase:voting', {
     gifs: gifsList,
+    prompt: gameState.currentPrompt,
     timerEndTime: gameState.timerEndTime
   });
   
-  // Auto-advance after 1 minute
+  // Auto-advance after 100 seconds
   if (gameState.timer) clearTimeout(gameState.timer);
   gameState.timer = setTimeout(() => {
     endRound();
-  }, 60000);
+  }, 100000);
 }
 
 function endRound() {
@@ -292,6 +294,7 @@ function endGame() {
 function resetGame() {
   if (gameState.timer) clearTimeout(gameState.timer);
   gameState.players = {};
+  gameState.disconnectedPlayers = {};
   gameState.gameMaster = null;
   gameState.currentRound = 0;
   gameState.maxRounds = 10;
@@ -316,16 +319,28 @@ io.on('connection', (socket) => {
   
   // Player joins
   socket.on('player:join', (data) => {
+    const playerKey = `${data.name}-${data.emoji}`;
+    let points = 0;
+    let wasGM = false;
+    
+    // Check if this player is rejoining (same name+emoji)
+    if (gameState.disconnectedPlayers[playerKey]) {
+      points = gameState.disconnectedPlayers[playerKey].points;
+      wasGM = gameState.disconnectedPlayers[playerKey].wasGM;
+      delete gameState.disconnectedPlayers[playerKey];
+      console.log(`Player ${data.name} rejoined with ${points} points`);
+    }
+    
     gameState.players[socket.id] = {
       id: socket.id,
       name: data.name,
       emoji: data.emoji,
-      points: 0,
-      isGM: data.isGM || false
+      points: points,
+      isGM: data.isGM || wasGM || false
     };
     
     // Only allow GM if none exists
-    if (data.isGM && gameState.gameMaster === null) {
+    if ((data.isGM || wasGM) && gameState.gameMaster === null) {
       gameState.gameMaster = socket.id;
       gameState.players[socket.id].isGM = true;
     } else if (data.isGM && gameState.gameMaster !== null) {
@@ -357,7 +372,7 @@ io.on('connection', (socket) => {
         const j = Math.floor(Math.random() * (i + 1));
         [gifsList[i], gifsList[j]] = [gifsList[j], gifsList[i]];
       }
-      socket.emit('phase:voting', { gifs: gifsList, timerEndTime: gameState.timerEndTime });
+      socket.emit('phase:voting', { gifs: gifsList, prompt: gameState.currentPrompt, timerEndTime: gameState.timerEndTime });
       
       const voteCounts = {};
       Object.entries(gameState.votes).forEach(([gifId, voters]) => {
@@ -555,7 +570,25 @@ io.on('connection', (socket) => {
         resetGame();
         io.emit('game:reset', { message: 'Game Master left. Returning to lobby...' });
       } else {
-        // Regular player left - just remove them, game continues
+        // Regular player left - save their points for potential rejoin
+        const player = gameState.players[socket.id];
+        const playerKey = `${player.name}-${player.emoji}`;
+        
+        // Save points for potential rejoin (expires after 5 minutes)
+        gameState.disconnectedPlayers[playerKey] = {
+          points: player.points,
+          wasGM: false,
+          disconnectedAt: Date.now()
+        };
+        
+        // Clean up old disconnected players (older than 5 minutes)
+        const fiveMinutesAgo = Date.now() - 300000;
+        Object.keys(gameState.disconnectedPlayers).forEach(key => {
+          if (gameState.disconnectedPlayers[key].disconnectedAt < fiveMinutesAgo) {
+            delete gameState.disconnectedPlayers[key];
+          }
+        });
+        
         delete gameState.players[socket.id];
         // Also remove their GIF and votes if they had any
         delete gameState.gifs[socket.id];

@@ -67,7 +67,7 @@
                     <div class="selected-gif-container" id="selected-gif-container" style="display: none;">
                         <h4>Your Selection:</h4>
                         <img id="selected-gif-preview" src="" alt="Selected GIF">
-                        <button id="submit-gif-btn" class="btn-primary">Submit This GIF</button>
+                        <button id="submit-gif-btn" class="btn-primary" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); font-size: 1.2em; padding: 15px 30px;">✓ Submit This GIF</button>
                         <button id="clear-selection-btn" class="btn-secondary">Choose Different</button>
                     </div>
                 </div>
@@ -77,7 +77,8 @@
             
             <!-- Voting Phase -->
             <div id="voting-phase" class="phase-screen" style="display: none;">
-                <h2>Vote for Your Favorite GIF!</h2>
+                <h2 id="voting-prompt-display" style="color: #667eea; font-style: italic; margin-bottom: 10px;"></h2>
+                <h3>Vote for Your Favorite GIF!</h3>
                 <p class="phase-description">Click on a GIF to vote for it</p>
                 <div class="gifs-grid" id="gifs-grid"></div>
             </div>
