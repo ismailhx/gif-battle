@@ -320,10 +320,19 @@ socket.on('phase:voting', (data) => {
         document.getElementById('gifs-grid').innerHTML = 
             '<p style="text-align: center; color: #666; font-size: 1.2em; grid-column: 1/-1;">⏰ No GIFs were submitted this round!</p>';
     } else {
-        displayVotingGifs(data.gifs);
-        if (data.timerEndTime) {
-            startTimer(data.timerEndTime);
-        }
+        // Show loading message while preloading GIFs
+        document.getElementById('gifs-grid').innerHTML = 
+            '<p style="text-align: center; color: #667eea; font-size: 1.5em; grid-column: 1/-1;">⏳ Loading GIFs...</p>';
+        
+        // Preload all GIF images before displaying
+        preloadGifs(data.gifs).then(() => {
+            displayVotingGifs(data.gifs);
+            if (data.timerEndTime) {
+                startTimer(data.timerEndTime);
+            }
+            // Notify server that we're ready
+            socket.emit('gifs:loaded');
+        });
     }
 });
 
@@ -721,6 +730,23 @@ function updateLeaderboard(players) {
     });
 }
 
+// Preload GIF images before displaying
+function preloadGifs(gifs) {
+    const promises = gifs.map(gif => {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.onload = resolve;
+            img.onerror = resolve; // Resolve even on error to not block others
+            img.src = gif.previewUrl || gif.url;
+            
+            // Timeout fallback - don't wait forever
+            setTimeout(resolve, 5000);
+        });
+    });
+    
+    return Promise.all(promises);
+}
+
 function displayVotingGifs(gifs) {
     const container = document.getElementById('gifs-grid');
     container.innerHTML = '';
@@ -752,7 +778,7 @@ function displayVotingGifs(gifs) {
         
         div.innerHTML = `
             ${isMyGif ? '<div class="your-gif-badge">⭐ YOUR GIF ⭐</div>' : ''}
-            <img src="${gif.previewUrl || gif.url}" alt="GIF" loading="lazy">
+            <img src="${gif.previewUrl || gif.url}" alt="GIF">
             <div class="gif-votes">
                 <span class="vote-count" data-gif-id="${gif.id}">0 votes</span>
             </div>
