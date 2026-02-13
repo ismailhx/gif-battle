@@ -348,12 +348,18 @@ io.on('connection', (socket) => {
       isGM: data.isGM || wasGM || false
     };
     
-    // Only allow GM if none exists
-    if ((data.isGM || wasGM) && gameState.gameMaster === null) {
-      gameState.gameMaster = socket.id;
-      gameState.players[socket.id].isGM = true;
-    } else if (data.isGM && gameState.gameMaster !== null) {
-      gameState.players[socket.id].isGM = false;
+    // Handle GM status
+    if (data.isGM || wasGM) {
+      // If this player was/is GM, update the gameMaster reference
+      // (handles GM refresh where socket.id changes)
+      if (gameState.gameMaster === null || wasGM) {
+        gameState.gameMaster = socket.id;
+        gameState.players[socket.id].isGM = true;
+        console.log(`GM set to ${socket.id} (${data.name})`);
+      } else if (gameState.gameMaster !== null && !wasGM) {
+        // Someone else is already GM
+        gameState.players[socket.id].isGM = false;
+      }
     }
     
     socket.emit('player:joined', {
@@ -495,8 +501,11 @@ io.on('connection', (socket) => {
   
   // GM starts commenting phase
   socket.on('start:commenting', () => {
+    console.log(`start:commenting from ${socket.id}, GM is ${gameState.gameMaster}, phase is ${gameState.phase}`);
     if (socket.id === gameState.gameMaster && gameState.phase === 'results') {
       startCommentingPhase();
+    } else {
+      console.log('start:commenting rejected - not GM or not in results phase');
     }
   });
   
@@ -588,9 +597,14 @@ io.on('connection', (socket) => {
         // Save points for potential rejoin (expires after 5 minutes)
         gameState.disconnectedPlayers[playerKey] = {
           points: player.points,
-          wasGM: false,
+          wasGM: player.isGM || false,
           disconnectedAt: Date.now()
         };
+        
+        // If this was the GM, clear the gameMaster reference so they can reclaim it
+        if (player.isGM) {
+          gameState.gameMaster = null;
+        }
         
         // Clean up old disconnected players (older than 5 minutes)
         const fiveMinutesAgo = Date.now() - 300000;

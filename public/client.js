@@ -649,6 +649,7 @@ document.getElementById('clear-selection-btn').addEventListener('click', () => {
 
 document.getElementById('start-commenting-btn').addEventListener('click', () => {
     playSound('click');
+    console.log('Start commenting button clicked, emitting start:commenting');
     socket.emit('start:commenting');
     document.getElementById('gm-results-buttons').style.display = 'none';
 });
