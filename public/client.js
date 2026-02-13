@@ -1170,9 +1170,8 @@ function generateAndDownloadHTML(history) {
                                 ${gif.comments && gif.comments.length > 0 
                                     ? gif.comments.map(c => `
                                         <div class="comment ${c.type === 'vote' ? 'vote-comment' : 'own-comment'}">
-                                            <span class="comment-author">${escapeHtml(c.voterName)}:</span>
-                                            <span class="comment-type">${c.type === 'vote' ? '🗳️ voted' : '⭐ creator'}</span>
-                                            <br>${escapeHtml(c.comment)}
+                                            <span class="comment-type">${c.type === 'vote' ? '🗳️ Voter' : '⭐ Creator'}:</span>
+                                            ${escapeHtml(c.comment)}
                                         </div>
                                     `).join('')
                                     : '<div class="no-comments">No comments</div>'
