@@ -321,16 +321,39 @@ socket.on('phase:voting', (data) => {
             '<p style="text-align: center; color: #666; font-size: 1.2em; grid-column: 1/-1;">⏰ No GIFs were submitted this round!</p>';
     } else {
         // Show loading message while preloading GIFs
-        document.getElementById('gifs-grid').innerHTML = 
-            '<p style="text-align: center; color: #667eea; font-size: 1.5em; grid-column: 1/-1;">⏳ Loading GIFs...</p>';
+        const container = document.getElementById('gifs-grid');
+        container.innerHTML = `
+            <div style="text-align: center; grid-column: 1/-1;">
+                <p style="color: #667eea; font-size: 1.5em;">⏳ Loading GIFs...</p>
+                <button id="retry-load-btn" style="display: none; margin-top: 15px; padding: 10px 25px; background: #667eea; color: white; border: none; border-radius: 8px; font-size: 1em; cursor: pointer;">Retry Loading</button>
+            </div>
+        `;
         
-        // Preload all GIF images before displaying
-        preloadGifs(data.gifs).then(() => {
+        // Function to show GIFs
+        const showGifsNow = () => {
+            clearTimeout(retryTimeout);
             displayVotingGifs(data.gifs);
             if (data.timerEndTime) {
                 startTimer(data.timerEndTime);
             }
-            // Notify server that we're ready
+        };
+        
+        // Show retry button after 3 seconds
+        const retryTimeout = setTimeout(() => {
+            const retryBtn = document.getElementById('retry-load-btn');
+            if (retryBtn) {
+                retryBtn.style.display = 'inline-block';
+                retryBtn.onclick = showGifsNow;
+            }
+        }, 3000);
+        
+        // Preload all GIF images before displaying
+        preloadGifs(data.gifs).then(() => {
+            clearTimeout(retryTimeout);
+            displayVotingGifs(data.gifs);
+            if (data.timerEndTime) {
+                startTimer(data.timerEndTime);
+            }
             socket.emit('gifs:loaded');
         });
     }
