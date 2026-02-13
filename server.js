@@ -61,18 +61,21 @@ function startSubmittingPhase() {
   gameState.phase = 'submitting';
   gameState.gifs = {};
   gameState.votes = {};
-  gameState.timerEndTime = Date.now() + 100000; // 100 seconds to find a GIF
+  const duration = 100000; // 100 seconds to find a GIF
+  gameState.timerEndTime = Date.now() + duration;
   
   io.emit('phase:submitting', {
     prompt: gameState.currentPrompt,
-    timerEndTime: gameState.timerEndTime
+    duration: duration
   });
   
   // Auto-advance after 100 seconds
   if (gameState.timer) clearTimeout(gameState.timer);
   gameState.timer = setTimeout(() => {
-    startVotingPhase();
-  }, 100000);
+    if (gameState.phase === 'submitting') {
+      startVotingPhase();
+    }
+  }, duration);
 }
 
 function startVotingPhase() {
@@ -99,19 +102,22 @@ function startVotingPhase() {
     [gifsList[i], gifsList[j]] = [gifsList[j], gifsList[i]];
   }
   
-  gameState.timerEndTime = Date.now() + 100000; // 100 seconds to vote
+  const duration = 100000; // 100 seconds to vote
+  gameState.timerEndTime = Date.now() + duration;
   
   io.emit('phase:voting', {
     gifs: gifsList,
     prompt: gameState.currentPrompt,
-    timerEndTime: gameState.timerEndTime
+    duration: duration
   });
   
   // Auto-advance after 100 seconds
   if (gameState.timer) clearTimeout(gameState.timer);
   gameState.timer = setTimeout(() => {
-    endRound();
-  }, 100000);
+    if (gameState.phase === 'voting') {
+      endRound();
+    }
+  }, duration);
 }
 
 function endRound() {
@@ -176,12 +182,13 @@ function startCommentingPhase() {
   if (gameState.timer) clearTimeout(gameState.timer);
   gameState.phase = 'commenting';
   gameState.comments = {}; // { oderId: { voteComment, ownComment, votedGifId, ownGifId } }
-  gameState.timerEndTime = Date.now() + 90000; // 90 seconds to comment
+  const duration = 90000; // 90 seconds to comment
+  gameState.timerEndTime = Date.now() + duration;
   
   // Prepare GIFs for commenting (with player info)
   const gifsList = Object.entries(gameState.gifs).map(([playerId, gifData]) => ({
     id: playerId,
-    playerName: gameState.players[playerId]?.name || 'Unknown',
+    playerName: gameState.players[playerId]?.name || '😀',
     playerEmoji: gameState.players[playerId]?.emoji || '😀',
     url: gifData.url,
     previewUrl: gifData.previewUrl
@@ -198,13 +205,15 @@ function startCommentingPhase() {
   io.emit('phase:commenting', {
     gifs: gifsList,
     playerVotes: playerVotes,
-    timerEndTime: gameState.timerEndTime
+    duration: duration
   });
   
   // Auto-advance after 90 seconds
   gameState.timer = setTimeout(() => {
-    saveRoundAndAdvance();
-  }, 90000);
+    if (gameState.phase === 'commenting') {
+      saveRoundAndAdvance();
+    }
+  }, duration);
 }
 
 function saveRoundAndAdvance() {
@@ -356,11 +365,12 @@ io.on('connection', (socket) => {
     io.emit('players:update', getPlayersList());
     broadcastGameState();
     
-    // Sync new player to current phase
+    // Sync new player to current phase (send remaining duration)
     if (gameState.phase === 'submitting') {
+      const remainingTime = Math.max(0, gameState.timerEndTime - Date.now());
       socket.emit('phase:submitting', {
         prompt: gameState.currentPrompt,
-        timerEndTime: gameState.timerEndTime
+        duration: remainingTime
       });
     } else if (gameState.phase === 'voting') {
       const gifsList = Object.entries(gameState.gifs).map(([playerId, gifData]) => ({
@@ -372,7 +382,8 @@ io.on('connection', (socket) => {
         const j = Math.floor(Math.random() * (i + 1));
         [gifsList[i], gifsList[j]] = [gifsList[j], gifsList[i]];
       }
-      socket.emit('phase:voting', { gifs: gifsList, prompt: gameState.currentPrompt, timerEndTime: gameState.timerEndTime });
+      const remainingTime = Math.max(0, gameState.timerEndTime - Date.now());
+      socket.emit('phase:voting', { gifs: gifsList, prompt: gameState.currentPrompt, duration: remainingTime });
       
       const voteCounts = {};
       Object.entries(gameState.votes).forEach(([gifId, voters]) => {

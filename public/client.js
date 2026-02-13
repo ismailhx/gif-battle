@@ -284,7 +284,9 @@ socket.on('phase:submitting', (data) => {
     selectedGifData = null;
     
     // Start timer FIRST so it's visible immediately for everyone
-    startTimer(data.timerEndTime);
+    // Use duration to calculate end time locally (better sync)
+    const timerEndTime = Date.now() + (data.duration || 100000);
+    startTimer(timerEndTime);
     
     // Update UI elements (only if they exist - GM doesn't have these)
     const promptDisplay = document.getElementById('submitting-prompt-display');
@@ -343,6 +345,9 @@ socket.on('phase:voting', (data) => {
         
         let gifsShown = false;
         
+        // Calculate end time locally for better sync
+        const timerEndTime = Date.now() + (data.duration || 100000);
+        
         // Function to show GIFs (only once)
         const showGifsNow = () => {
             if (gifsShown) return;
@@ -350,9 +355,7 @@ socket.on('phase:voting', (data) => {
             clearTimeout(retryTimeout);
             clearTimeout(forceTimeout);
             displayVotingGifs(data.gifs);
-            if (data.timerEndTime) {
-                startTimer(data.timerEndTime);
-            }
+            startTimer(timerEndTime);
         };
         
         // Show retry button after 2 seconds
@@ -434,7 +437,10 @@ socket.on('phase:commenting', (data) => {
     
     showPhase('commenting');
     displayCommentingGifs(data.gifs, myVotedGif, myOwnGifId);
-    startTimer(data.timerEndTime);
+    
+    // Use duration to calculate end time locally (better sync)
+    const timerEndTime = Date.now() + (data.duration || 90000);
+    startTimer(timerEndTime);
     
     // Reset UI state for new commenting phase
     document.getElementById('comment-status').textContent = '';
