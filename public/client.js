@@ -330,36 +330,44 @@ socket.on('phase:voting', (data) => {
         container.innerHTML = `
             <div style="text-align: center; grid-column: 1/-1;">
                 <p style="color: #667eea; font-size: 1.5em;">⏳ Loading GIFs...</p>
-                <button id="retry-load-btn" style="display: none; margin-top: 15px; padding: 10px 25px; background: #667eea; color: white; border: none; border-radius: 8px; font-size: 1em; cursor: pointer;">Retry Loading</button>
+                <button id="retry-load-btn" style="display: none; margin-top: 15px; padding: 10px 25px; background: #11998e; color: white; border: none; border-radius: 8px; font-size: 1.1em; cursor: pointer; font-weight: 600;">Tap Here to Show GIFs</button>
             </div>
         `;
         
-        // Function to show GIFs
+        let gifsShown = false;
+        
+        // Function to show GIFs (only once)
         const showGifsNow = () => {
+            if (gifsShown) return;
+            gifsShown = true;
             clearTimeout(retryTimeout);
+            clearTimeout(forceTimeout);
             displayVotingGifs(data.gifs);
             if (data.timerEndTime) {
                 startTimer(data.timerEndTime);
             }
         };
         
-        // Show retry button after 3 seconds
+        // Show retry button after 2 seconds
         const retryTimeout = setTimeout(() => {
             const retryBtn = document.getElementById('retry-load-btn');
-            if (retryBtn) {
+            if (retryBtn && !gifsShown) {
                 retryBtn.style.display = 'inline-block';
                 retryBtn.onclick = showGifsNow;
             }
-        }, 3000);
+        }, 2000);
         
-        // Preload all GIF images before displaying
+        // FORCE show GIFs after 5 seconds no matter what
+        const forceTimeout = setTimeout(() => {
+            showGifsNow();
+        }, 5000);
+        
+        // Try to preload, but don't depend on it
         preloadGifs(data.gifs).then(() => {
-            clearTimeout(retryTimeout);
-            displayVotingGifs(data.gifs);
-            if (data.timerEndTime) {
-                startTimer(data.timerEndTime);
-            }
+            showGifsNow();
             socket.emit('gifs:loaded');
+        }).catch(() => {
+            showGifsNow();
         });
     }
 });
