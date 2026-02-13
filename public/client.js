@@ -310,6 +310,13 @@ socket.on('gifs:submitted', (data) => {
 });
 
 socket.on('phase:voting', (data) => {
+    // Auto-submit selected GIF if player didn't submit manually
+    if (selectedGifData && !hasSubmittedGif && !isGM) {
+        socket.emit('gif:submit', selectedGifData);
+        hasSubmittedGif = true;
+        showNotification('✅ Your selected GIF was auto-submitted!');
+    }
+    
     currentPhase = 'voting';
     myVotedGifId = null;
     stopTimer();
